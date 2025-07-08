@@ -33,7 +33,7 @@ if archivo:
 
             # Filtro general
             df_filtrado = df[df["periodo"].isin(periodos_seleccionados)].copy()
-            promedio_general = df_filtrado.groupby("periodo")["productividad"].mean().mean()
+            promedio_general = df_filtrado.groupby("periodo")["productividad"].nunique().mean()
             promedio_personas_mes = df_filtrado.groupby("periodo")["num_doc"].nunique().mean()
 
             alta_general = df_filtrado[df_filtrado["productividad"] > umbral_superior]
