@@ -34,7 +34,8 @@ if archivo:
             # Filtro general
             df_filtrado = df[df["periodo"].isin(periodos_seleccionados)].copy()
             total_general = df_filtrado["num_doc"].nunique()
-            promedio_general = df_filtrado["productividad"].mean()/periodos_seleccionados
+            promedio_general = df_filtrado.groupby("periodo")["productividad"].mean().mean()
+
 
             st.subheader("📋 Resumen General (todos los meses seleccionados)")
 
