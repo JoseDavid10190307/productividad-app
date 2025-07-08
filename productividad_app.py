@@ -31,30 +31,51 @@ if archivo:
             with col2:
                 umbral_inferior = st.number_input("🔻 Productividad **menor a** (baja productividad):", min_value=0.0, max_value=100.0, value=40.0)
 
-            # Filtro general
+            # Filtro por meses seleccionados
             df_filtrado = df[df["periodo"].isin(periodos_seleccionados)].copy()
-            promedio_general = df_filtrado.groupby("periodo")["productividad"].nunique().mean()
-            promedio_personas_mes = df_filtrado.groupby("periodo")["num_doc"].nunique().mean()
 
-            alta_general = df_filtrado[df_filtrado["productividad"] > umbral_superior]
-            baja_general = df_filtrado[df_filtrado["productividad"] < umbral_inferior]
+            # Promedios globales
+            promedio_general = df_filtrado.groupby("periodo")["productividad"].mean().mean()
+            promedio_personas_mes = df_filtrado.groupby("periodo")["num_doc"].nunique().mean() 
+            
+            # Total personas únicas en todos los meses seleccionados
+            total_general = df_filtrado["num_doc"].nunique()
 
-            porcentaje_alta = (len(alta_general) / promedio_personas_mes) * 100
-            porcentaje_baja = (len(baja_general) / promedio_personas_mes) * 100
+            # === LÓGICA DE ALTA Y BAJA PRODUCTIVIDAD ===
 
+            # 🔺 Alta productividad: promedio de productividad por persona > umbral
+            promedios_persona = df_filtrado.groupby("num_doc")["productividad"].mean().reset_index()
+            alta_general = promedios_persona[promedios_persona["productividad"] > umbral_superior]
+            num_alta = len(alta_general)
+
+            # 🔻 Baja productividad: personas con 2 o más registros por debajo del umbral
+            bajas_individuales = df_filtrado[df_filtrado["productividad"] < umbral_inferior]
+            bajas_contadas = bajas_individuales.groupby("num_doc").size()
+            baja_general = bajas_contadas[bajas_contadas >= 2].reset_index(name="conteo")
+            num_baja = len(baja_general)
+
+            # Porcentajes
+            porcentaje_alta = (num_alta / total_general) * 100
+            porcentaje_baja = (num_baja / total_general) * 100
+
+            # === VISUALIZACIÓN ===
             st.subheader("📋 Resumen General (todos los meses seleccionados)")
+            st.write(f"👥 Cantidad total de personas medidas: {total_general}")
             st.write(f"👥 Promedio de personas por mes: {promedio_personas_mes:.2f}")
             st.write(f"📈 Promedio de productividad general (por mes): **{promedio_general:.2f}**")
+
             st.markdown(f"""
-            - 🔺 Alta productividad: {len(alta_general)} personas ({porcentaje_alta:.2f}% del promedio mensual)  
-            - 🔻 Baja productividad: {len(baja_general)} personas ({porcentaje_baja:.2f}% del promedio mensual)
+            - 🔺 Alta productividad: {num_alta} personas ({porcentaje_alta:.2f}% del total)
+            - 🔻 Baja productividad: {num_baja} personas ({porcentaje_baja:.2f}% del total)
             """)
 
             with st.expander("🔺 Ver detalles de Alta Productividad (general)"):
-                st.dataframe(alta_general[["nombre", "num_doc", "periodo", "productividad"]])
+                alta_merge = pd.merge(alta_general, df_filtrado[["num_doc", "nombre"]].drop_duplicates(), on="num_doc", how="left")
+                st.dataframe(alta_merge[["nombre", "num_doc", "productividad"]].sort_values("productividad", ascending=False))
 
             with st.expander("🔻 Ver detalles de Baja Productividad (general)"):
-                st.dataframe(baja_general[["nombre", "num_doc", "periodo", "productividad"]])
+                baja_merge = pd.merge(baja_general, df_filtrado[["num_doc", "nombre"]].drop_duplicates(), on="num_doc", how="left")
+                st.dataframe(baja_merge[["nombre", "num_doc", "conteo"]].sort_values("conteo", ascending=False))
 
 
             # Descargar resultados como Excel
