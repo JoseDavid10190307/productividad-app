@@ -33,20 +33,21 @@ if archivo:
 
             # Filtro general
             df_filtrado = df[df["periodo"].isin(periodos_seleccionados)].copy()
-            total_general = df_filtrado["num_doc"].nunique()
             promedio_general = df_filtrado.groupby("periodo")["productividad"].mean().mean()
-
-
-            st.subheader("📋 Resumen General (todos los meses seleccionados)")
+            promedio_personas_mes = df_filtrado.groupby("periodo")["num_doc"].nunique().mean()
 
             alta_general = df_filtrado[df_filtrado["productividad"] > umbral_superior]
             baja_general = df_filtrado[df_filtrado["productividad"] < umbral_inferior]
 
-            st.write(f"👥 Total personas analizadas: {total_general}")
-            st.write(f"📈 Promedio de productividad general: **{promedio_general:.2f}**")
+            porcentaje_alta = (len(alta_general) / promedio_personas_mes) * 100
+            porcentaje_baja = (len(baja_general) / promedio_personas_mes) * 100
+
+            st.subheader("📋 Resumen General (todos los meses seleccionados)")
+            st.write(f"👥 Promedio de personas por mes: {promedio_personas_mes:.2f}")
+            st.write(f"📈 Promedio de productividad general (por mes): **{promedio_general:.2f}**")
             st.markdown(f"""
-            - 🔺 Alta productividad: {len(alta_general)} personas ({(len(alta_general)/total_general)*100:.2f}%)  
-            - 🔻 Baja productividad: {len(baja_general)} personas ({(len(baja_general)/total_general)*100:.2f}%)
+            - 🔺 Alta productividad: {len(alta_general)} personas ({porcentaje_alta:.2f}% del promedio mensual)  
+            - 🔻 Baja productividad: {len(baja_general)} personas ({porcentaje_baja:.2f}% del promedio mensual)
             """)
 
             with st.expander("🔺 Ver detalles de Alta Productividad (general)"):
@@ -54,6 +55,7 @@ if archivo:
 
             with st.expander("🔻 Ver detalles de Baja Productividad (general)"):
                 st.dataframe(baja_general[["nombre", "num_doc", "periodo", "productividad"]])
+
 
             # Descargar resultados como Excel
             def convertir_a_excel(df_dict):
