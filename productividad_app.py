@@ -27,9 +27,15 @@ if archivo:
             # Umbrales
             col1, col2 = st.columns(2)
             with col1:
-                umbral_superior = st.number_input("🔺 Productividad **mayor a** (alta productividad):", min_value=0.0, max_value=100.0, value=80.0)
+                umbral_superior = st.number_input("🔺 Productividad **mayor a** (alta productividad):", min_value=0.0, max_value=100.0, value=0.80)
             with col2:
-                umbral_inferior = st.number_input("🔻 Productividad **menor a** (baja productividad):", min_value=0.0, max_value=100.0, value=40.0)
+                umbral_inferior = st.number_input("🔻 Productividad **menor a** (baja productividad):", min_value=0.0, max_value=100.0, value=0.40)
+            
+            numero_meses_por_debajo = st.number_input( 
+                "🔻 Número mínimo de meses con baja productividad para considerar una persona como de baja productividad:",
+                min_value=1, max_value=12, value=2
+            )
+
 
             # Filtro por meses seleccionados
             df_filtrado = df[df["periodo"].isin(periodos_seleccionados)].copy()
@@ -51,7 +57,7 @@ if archivo:
             # 🔻 Baja productividad: personas con 2 o más registros por debajo del umbral
             bajas_individuales = df_filtrado[df_filtrado["productividad"] < umbral_inferior]
             bajas_contadas = bajas_individuales.groupby("num_doc").size()
-            baja_general = bajas_contadas[bajas_contadas >= 2].reset_index(name="conteo")
+            baja_general = bajas_contadas[bajas_contadas >= numero_meses_por_debajo].reset_index(name="conteo")
             num_baja = len(baja_general)
 
             # Porcentajes
@@ -72,11 +78,29 @@ if archivo:
             with st.expander("🔺 Ver detalles de Alta Productividad (general)"):
                 alta_merge = pd.merge(alta_general, df_filtrado[["num_doc", "nombre"]].drop_duplicates(), on="num_doc", how="left")
                 st.dataframe(alta_merge[["nombre", "num_doc", "productividad"]].sort_values("productividad", ascending=False))
-
+            
             with st.expander("🔻 Ver detalles de Baja Productividad (general)"):
-                baja_merge = pd.merge(baja_general, df_filtrado[["num_doc", "nombre"]].drop_duplicates(), on="num_doc", how="left")
-                st.dataframe(baja_merge[["nombre", "num_doc", "conteo"]].sort_values("conteo", ascending=False))
+                # Filtrar registros solo de baja productividad de las personas que están en baja_general
+                personas_baja = baja_general["num_doc"].unique()
+                df_bajas = df_filtrado[df_filtrado["num_doc"].isin(personas_baja) & (df_filtrado["productividad"] < umbral_inferior)].copy()
 
+                # Pivotear: una columna por periodo
+                pivot = df_bajas.pivot_table(
+                    index=["num_doc", "nombre"],
+                    columns="periodo",
+                    values="productividad",
+                    aggfunc="mean"
+                ).reset_index()
+
+                # Agregar la columna 'conteo' (cuántos meses tuvo baja productividad)
+                pivot = pd.merge(pivot, baja_general[["num_doc", "conteo"]], on="num_doc", how="left")
+
+                # Reordenar columnas: nombre, num_doc, conteo, y luego las columnas de periodos
+                cols_orden = ["nombre", "num_doc", "conteo"] + sorted([c for c in pivot.columns if c not in ["nombre", "num_doc", "conteo"]])
+                pivot = pivot[cols_orden]
+
+                # Mostrar la tabla ordenada por mayor conteo
+                st.dataframe(pivot.sort_values("conteo", ascending=False))
 
             # Descargar resultados como Excel
             def convertir_a_excel(df_dict):
